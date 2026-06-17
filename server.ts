@@ -12,6 +12,11 @@ const PORT = 3000;
 const DB_DIR = path.join(process.cwd(), "data");
 const DB_FILE = path.join(DB_DIR, "db.json");
 
+// Google Search Console site verification endpoint
+app.get("/google08889434b9c01c68.html", (req: Request, res: Response) => {
+  res.send("google-site-verification: google08889434b9c01c68.html");
+});
+
 // Helper function to non-blockingly forward submissions to Formspree
 async function sendToFormspree(eventType: string, data: any) {
   try {
