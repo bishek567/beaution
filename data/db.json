@@ -1,0 +1,182 @@
+{
+  "admin": {
+    "email": "admin@beaution.com",
+    "passwordHash": "4688ebdf3f374626488c5b5c76aee3150c2667513d3196d78d6c5b82c4db2dc0",
+    "salt": "3c2dcf5a642a1fdb6570f5ef6975c275",
+    "name": "Beaution Admin Portal"
+  },
+  "services": [
+    {
+      "id": "s1",
+      "title": "Bridal Makeup",
+      "description": "Luxury bridal transformation with premium HD cosmetics, long-lasting matte finish, gold fleck base, and customized brow styling.",
+      "originalPrice": 15000,
+      "offerPrice": 8000,
+      "image": "bridal_makeup"
+    },
+    {
+      "id": "s2",
+      "title": "Party Makeup",
+      "description": "High-end glam or classic elegant party makeover complete with dynamic highlighting, defined lining, and custom contouring.",
+      "originalPrice": 8000,
+      "offerPrice": 4999,
+      "image": "glam_makeup"
+    },
+    {
+      "id": "s3",
+      "title": "HD Makeup",
+      "description": "Specialized ultra-defined high definition camera-ready makeup, absolute lightweight look, optimal for photographers and professional shoots.",
+      "originalPrice": 12000,
+      "offerPrice": 7999,
+      "image": "makeup_setup"
+    },
+    {
+      "id": "s4",
+      "title": "Airbrush Makeup",
+      "description": "Flawless, water-resistant silicone mist finish delivering a flawless velvet complexion. Highly-demanded for state-of-the-art events.",
+      "originalPrice": 20000,
+      "offerPrice": 14999,
+      "image": "bridal_makeup"
+    },
+    {
+      "id": "s5",
+      "title": "Engagement Makeup",
+      "description": "Sophisticated radiant highlight-rich treatment capturing dynamic freshness for modern formal photo-ops and ring ceremonies.",
+      "originalPrice": 10000,
+      "offerPrice": 6999,
+      "image": "glam_makeup"
+    },
+    {
+      "id": "s6",
+      "title": "Hair Styling",
+      "description": "Premium creative hairstyles ranging from luxury floral braids to custom sleek buns, volumizing updos, and expert texture curling.",
+      "originalPrice": 3500,
+      "offerPrice": 1999,
+      "image": "makeup_setup"
+    },
+    {
+      "id": "s7",
+      "title": "Saree Draping",
+      "description": "Masterful ethnic saree pre-pleating and neat customized draping in Classic Gujarati, Bengali, modern fishtail or South Indian style.",
+      "originalPrice": 2000,
+      "offerPrice": 999,
+      "image": "bridal_makeup"
+    }
+  ],
+  "packages": [
+    {
+      "id": "p1",
+      "name": "Bronze Package",
+      "price": 7999,
+      "discount": 25,
+      "badge": "Popular For Parties",
+      "services": [
+        "Party Makeup",
+        "Hair Styling",
+        "Saree Draping"
+      ]
+    },
+    {
+      "id": "p2",
+      "name": "Silver Package",
+      "price": 12999,
+      "discount": 30,
+      "badge": "Best Value Mini Bridal",
+      "services": [
+        "Engagement Makeup",
+        "HD Hair Styling",
+        "Premium Draping",
+        "Skin Prep Polish"
+      ]
+    },
+    {
+      "id": "p3",
+      "name": "Gold Package",
+      "price": 19999,
+      "discount": 35,
+      "badge": "Premium Celebrity Styling",
+      "services": [
+        "HD Makeup",
+        "Luxury Designer Haircut & Styling",
+        "Saree Draping",
+        "Hydrating Facial Mask",
+        "Eyelashes Extensions"
+      ]
+    },
+    {
+      "id": "p4",
+      "name": "Premium Package",
+      "price": 29999,
+      "discount": 40,
+      "badge": "Ultimate Queen Experience",
+      "services": [
+        "Airbrush HD Luxury Bridal Makeup",
+        "Elite Royal Hair Design",
+        "Saree Pleating & Draping",
+        "Full Body Prep Polish",
+        "Handmade Crystal Nail Art",
+        "Post-Event Easy Styling Session"
+      ]
+    }
+  ],
+  "bookings": [
+    {
+      "id": "b_seed_1",
+      "customerName": "Aishwarya Rai",
+      "customerEmail": "aishwarya@example.com",
+      "customerPhone": "9876543210",
+      "date": "2026-06-20",
+      "time": "10:00",
+      "serviceId": "s1",
+      "selectedName": "Bridal Makeup",
+      "amountPaid": 11999,
+      "paymentMethod": "UPI",
+      "paymentStatus": "Completed",
+      "receiptNo": "REC-93821039",
+      "createdAt": "2026-06-17T12:42:01.758Z"
+    },
+    {
+      "id": "b_seed_2",
+      "customerName": "Pooja Hegde",
+      "customerEmail": "pooja@example.com",
+      "customerPhone": "9123456780",
+      "date": "2026-06-25",
+      "time": "14:30",
+      "packageId": "p2",
+      "selectedName": "Silver Package",
+      "amountPaid": 12999,
+      "paymentMethod": "Credit Card",
+      "paymentStatus": "Completed",
+      "receiptNo": "REC-28104821",
+      "createdAt": "2026-06-17T12:42:01.758Z"
+    }
+  ],
+  "messages": [
+    {
+      "id": "m_seed_1",
+      "name": "Sneha Sen",
+      "phone": "9000012345",
+      "email": "sneha@example.com",
+      "message": "Hi Beaution Team! I am planning my wedding on Dec 12th. Do you offer packages for destination weddings outside the city? Please reply of availability.",
+      "status": "Unread",
+      "createdAt": "2026-06-17T12:42:01.758Z"
+    },
+    {
+      "id": "m_seed_2",
+      "name": "Ravi Kumar (Spam Vendor)",
+      "phone": "0000000000",
+      "email": "spamvisitor@spammail.com",
+      "message": "Get cheap traffic and followers for Instagram profiles. Special discount of 80% if booked today!",
+      "status": "Spam",
+      "createdAt": "2026-06-17T12:42:01.758Z"
+    }
+  ],
+  "support": {
+    "dealerName": "Beaution Luxury Headquarters",
+    "contactNumber": "+91 93429 56011",
+    "email": "support@beaution.com",
+    "location": "7th Avenue, Luxury Plaza, MG Road, Bangalore - 560001",
+    "supportTiming": "Daily 9:00 AM - 9:00 PM IST",
+    "whatsappNumber": "919342956011"
+  }
+}

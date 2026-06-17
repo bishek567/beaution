@@ -1,0 +1,8 @@
+{
+  "name": "Remix: Beaution",
+  "description": "A luxury beauty and expert makeup services portal with appointment booking, payment processing, client feedback, and a complete admin dashboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
