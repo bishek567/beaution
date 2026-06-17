@@ -12,6 +12,38 @@ const PORT = 3000;
 const DB_DIR = path.join(process.cwd(), "data");
 const DB_FILE = path.join(DB_DIR, "db.json");
 
+// Helper function to non-blockingly forward submissions to Formspree
+async function sendToFormspree(eventType: string, data: any) {
+  try {
+    const payload = {
+      eventType,
+      submittedAt: new Date().toISOString(),
+      ...data
+    };
+    
+    // Non-blocking fire-and-forget submission to prevent latency for client operations
+    globalThis.fetch("https://formspree.io/f/xlgkkbgr", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+      },
+      body: JSON.stringify(payload)
+    }).then(async (response) => {
+      if (response.ok) {
+        console.log(`[Formspree] Successfully sent event: ${eventType}`);
+      } else {
+        const text = await response.text();
+        console.error(`[Formspree] Server responded with error status ${response.status}: ${text}`);
+      }
+    }).catch((err) => {
+      console.error("[Formspree] Fetch network error:", err);
+    });
+  } catch (error) {
+    console.error("[Formspree] Integration runtime error:", error);
+  }
+}
+
 // Define interfaces for internal db
 interface DbSchema {
   admin: {
@@ -452,6 +484,12 @@ app.put("/api/customer/profile", async (req: Request, res: Response) => {
 
     await saveDb(db);
 
+    const profileData = db.customers.find((c: any) => c.phone === cleanPhone);
+    // Send profile data update to Formspree link
+    sendToFormspree("CUSTOMER_PROFILE_UPDATE", {
+      profile: profileData
+    });
+
     // Re-fetch all bookings
     const bookings = db.bookings.filter((b: any) => b.customerPhone === cleanPhone);
 
@@ -513,6 +551,12 @@ app.put("/api/customer/bookings/:id", async (req: Request, res: Response) => {
     };
     
     await saveDb(db);
+    
+    // Send rescheduled booking to Formspree
+    sendToFormspree("BOOKING_RESCHEDULED", {
+      booking: db.bookings[idx]
+    });
+    
     return res.json({ success: true, booking: db.bookings[idx], message: "Booking content revised successfully!" });
   } catch (err: any) {
     return res.status(500).json({ error: "Rescheduling processor failure: " + err.message });
@@ -540,9 +584,16 @@ app.delete("/api/customer/bookings/:id", async (req: Request, res: Response) => 
       return res.status(403).json({ error: "Unauthorized: Ownership verification failed." });
     }
     
+    const cancelledBooking = db.bookings[idx];
+    
     // Remove booking
     db.bookings = db.bookings.filter((b) => b.id !== id);
     await saveDb(db);
+    
+    // Send booking cancellation to Formspree
+    sendToFormspree("BOOKING_CANCELLED", {
+      cancelledBooking
+    });
     
     return res.json({ success: true, message: "Look reservation has been cancelled and slot released successfully." });
   } catch (err: any) {
@@ -735,6 +786,11 @@ app.post("/api/bookings", sensitiveRateLimiter(6, 60000), async (req: Request, r
     db.bookings.push(newBooking);
     await saveDb(db);
 
+    // Send booking data to Formspree link
+    sendToFormspree("NEW_BOOKING", {
+      booking: newBooking
+    });
+
     res.status(201).json({
       success: true,
       booking: newBooking,
@@ -807,6 +863,11 @@ app.post("/api/messages", sensitiveRateLimiter(5, 60000), async (req: Request, r
 
     db.messages.push(newMessage);
     await saveDb(db);
+
+    // Send contact submission feed to Formspree
+    sendToFormspree("NEW_CONTACT_MESSAGE", {
+      contact: newMessage
+    });
 
     res.json({ success: true, message: "Your message has reached Beaution care team. We will call or email you soon." });
   } catch (err: any) {
