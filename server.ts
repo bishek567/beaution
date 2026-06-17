@@ -406,6 +406,19 @@ app.post("/api/auth/otp/generate", sensitiveRateLimiter(6, 60000), async (req: R
 
     activeOtps.set(cleanPhone, { otp: generatedOtp, expiresAt });
 
+    // Send OTP request record to Supabase
+    sendToSupabase("otps", {
+      phone: cleanPhone,
+      otp: generatedOtp,
+      expiresAt: new Date(expiresAt).toISOString(),
+      expires_at: new Date(expiresAt).toISOString(),
+      verified: false,
+      createdAt: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    });
+
     console.log(`[OTP Engine] Generated code ${generatedOtp} for customer phone ${cleanPhone}`);
 
     return res.json({
@@ -447,6 +460,13 @@ app.post("/api/auth/otp/verify", sensitiveRateLimiter(15, 60000), async (req: Re
     // OTP validated successfully! Delete it now
     activeOtps.delete(cleanPhone);
 
+    // Sync OTP verified status to Supabase table
+    sendToSupabase("otps", {
+      verified: true,
+      updatedAt: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }, "PATCH", `phone=eq.${encodeURIComponent(cleanPhone)}`);
+
     const db = await getDb();
     if (!db.customers) {
       db.customers = [];
@@ -467,6 +487,17 @@ app.post("/api/auth/otp/verify", sensitiveRateLimiter(15, 60000), async (req: Re
         };
         db.customers.push(profile);
         await saveDb(db);
+
+        // Sync new profile to Supabase
+        sendToSupabase("customers", {
+          phone: profile.phone,
+          name: profile.name,
+          email: profile.email,
+          createdAt: profile.createdAt,
+          created_at: profile.createdAt,
+          updatedAt: profile.createdAt,
+          updated_at: profile.createdAt
+        });
       }
     }
 
@@ -1142,6 +1173,19 @@ CREATE TABLE IF NOT EXISTS messages (
   status text,
   created_at text,
   createdAt text
+);
+
+-- Table 4: OTP Logs & Verification status tracker
+CREATE TABLE IF NOT EXISTS otps (
+  phone text PRIMARY KEY,
+  otp text,
+  expires_at text,
+  expiresAt text,
+  verified boolean DEFAULT false,
+  created_at text,
+  createdAt text,
+  updated_at text,
+  updatedAt text
 );`
     });
   } catch (error: any) {
