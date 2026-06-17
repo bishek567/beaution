@@ -42,6 +42,57 @@ export default function Admin({ services, packages, supportInfo, onRefreshAllDat
   const [loadingAction, setLoadingAction] = useState(false);
   const [actionSuccessText, setActionSuccessText] = useState("");
 
+  // Supabase states
+  const [supabaseStatus, setSupabaseStatus] = useState<any>(null);
+  const [syncingSupabase, setSyncingSupabase] = useState(false);
+  const [syncReport, setSyncReport] = useState<any>(null);
+  const [copiedScript, setCopiedScript] = useState(false);
+
+  const fetchSupabaseStatus = async () => {
+    try {
+      const headers = { "Authorization": `Bearer ${sessionToken}` };
+      const res = await fetch("/api/admin/supabase-status", { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setSupabaseStatus(data);
+      }
+    } catch (err) {
+      console.error("Could not fetch Supabase configuration validation:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "supabase" && sessionToken) {
+      fetchSupabaseStatus();
+    }
+  }, [activeTab, sessionToken]);
+
+  const handleBulkSyncSupabase = async () => {
+    setSyncingSupabase(true);
+    setSyncReport(null);
+    try {
+      const headers = {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${sessionToken}`
+      };
+      const response = await fetch("/api/admin/supabase-sync", {
+        method: "POST",
+        headers
+      });
+      const data = await response.json();
+      if (response.ok) {
+        setSyncReport(data);
+        setActionSuccessText("Database records successfully synchronized to Supabase!");
+      } else {
+        setSyncReport({ error: data.error || "Failed syncing database." });
+      }
+    } catch (err: any) {
+      setSyncReport({ error: err.message || "Network sync failed." });
+    } finally {
+      setSyncingSupabase(false);
+    }
+  };
+
   // Fetch full live admin dashboard feeds
   const fetchAdminFeeds = async () => {
     if (!sessionToken) return;
@@ -494,6 +545,7 @@ export default function Admin({ services, packages, supportInfo, onRefreshAllDat
               { id: "packages", label: "Offers & combos", icon: <Gift className="w-4 h-4" /> },
               { id: "messages", label: "Spam & Messages", icon: <Mail className="w-4 h-4 text-rose-500" /> },
               { id: "contacts", label: "Dealer timings", icon: <Settings className="w-4 h-4" /> },
+              { id: "supabase", label: "Supabase DB Status", icon: <Sparkles className="w-4 h-4 text-emerald-600" /> },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1032,6 +1084,138 @@ export default function Admin({ services, packages, supportInfo, onRefreshAllDat
                     Save timings changes
                   </button>
                 </form>
+              </div>
+            )}
+
+            {/* TAB: SUPABASE SYNCHRONIZATION HUD */}
+            {activeTab === "supabase" && (
+              <div className="space-y-8">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-rose-50 pb-4">
+                  <div>
+                    <h2 className="font-serif text-2xl font-bold text-stone-900">Supabase Integration Panel</h2>
+                    <p className="text-stone-400 text-xs sm:text-sm mt-1">
+                      Monitor CRM persistence status, copy DDL initialization queries, and bulk-sync data
+                    </p>
+                  </div>
+                  <div>
+                    <button
+                      onClick={fetchSupabaseStatus}
+                      className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 font-bold rounded-full text-[10px] uppercase tracking-wider transition-colors"
+                    >
+                      Pint/Refresh Status
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sub-card: Connection Status */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="p-5 rounded-2xl bg-stone-50 border border-stone-200/60 shadow-sm flex flex-col justify-between">
+                    <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block mb-1">Endpoints connectivity</span>
+                    <div className="flex items-center gap-2.5 mt-2">
+                      <span className={`w-3 h-3 rounded-full ${supabaseStatus?.online ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`}></span>
+                      <strong className="text-sm text-stone-800">
+                        {supabaseStatus === null ? "Diagnosing..." : (supabaseStatus?.online ? "Connected / Online" : "Connection Error")}
+                      </strong>
+                    </div>
+                    <span className="text-[11px] text-stone-400 mt-3 block font-mono overflow-ellipsis truncate">
+                      {supabaseStatus?.supabaseUrl || "https://zsorsmfbxllznwestqvd.supabase.co"}
+                    </span>
+                  </div>
+
+                  <div className="p-5 rounded-2xl bg-stone-50 border border-stone-200/60 shadow-sm flex flex-col justify-between">
+                    <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block mb-1">Supabase Project ID</span>
+                    <strong className="text-lg text-stone-800 block mt-1 font-mono">zsorsmfbxllznwestqvd</strong>
+                    <span className="text-[11px] text-stone-400 mt-2 block">
+                      Active Schema: Public
+                    </span>
+                  </div>
+
+                  <div className="p-5 rounded-2xl bg-stone-50 border border-stone-200/60 shadow-sm flex flex-col justify-between">
+                    <span className="text-[10px] font-bold text-stone-400 uppercase tracking-wider block mb-1">Form Real-time persistence</span>
+                    <strong className="text-sm text-stone-800 block mt-2 text-emerald-600 font-bold flex items-center gap-1.5">
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      Live CRUD Active
+                    </strong>
+                    <span className="text-[11px] text-stone-400 mt-1 block leading-relaxed">
+                      Every new booking checkout and customer profile updates are instantly posted to Supabase!
+                    </span>
+                  </div>
+                </div>
+
+                {/* Mass Sync Segment */}
+                <div className="p-6 rounded-2xl bg-emerald-50/40 border border-emerald-100/80 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <h3 className="font-semibold text-stone-900 text-sm">bulk manual database migration</h3>
+                      <p className="text-stone-500 text-xs leading-relaxed max-w-xl">
+                        Instantly push all existing local JSON records (including cumulative client reservations, customer profiles, and contact inquiries) directly into your Supabase database in a single sweep.
+                      </p>
+                    </div>
+                    <div>
+                      <button
+                        onClick={handleBulkSyncSupabase}
+                        disabled={syncingSupabase}
+                        className={`w-full sm:w-auto px-6 py-3 rounded-full text-xs font-bold uppercase tracking-wider transition-all inline-flex items-center justify-center gap-2 ${
+                          syncingSupabase
+                            ? "bg-stone-300 text-stone-500 cursor-not-allowed"
+                            : "bg-emerald-600 hover:bg-emerald-700 text-white shadow-md shadow-emerald-600/10"
+                        }`}
+                      >
+                        {syncingSupabase ? (
+                          <>
+                            <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                            Syncing database...
+                          </>
+                        ) : "Synchronize Database Now"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {syncReport && (
+                    <div className="p-4 rounded-xl bg-white border border-stone-200/80 text-xs font-mono space-y-2 mt-4 max-h-[220px] overflow-y-auto">
+                      <h4 className="font-bold text-stone-800">Migration synchronized report:</h4>
+                      {syncReport.error ? (
+                        <p className="text-rose-500 font-bold">Error: {syncReport.error}</p>
+                      ) : (
+                        <div className="space-y-1 text-stone-600">
+                          <p className="text-emerald-600 font-bold">✓ Bulk Sync triggered successfully!</p>
+                          <p>• Bookings synced count: {syncReport.reports?.bookings?.length || 0}</p>
+                          <p>• Customers profiles synced count: {syncReport.reports?.customers?.length || 0}</p>
+                          <p>• Message logs synced count: {syncReport.reports?.messages?.length || 0}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Sub-card: Copy SQL scripts */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-stone-900 text-sm">Supabase Database Tables Initialization Script</h3>
+                      <p className="text-stone-400 text-xs mt-0.5">Please paste this script into your Supabase SQL Editor to instantly map correct tables & schemas</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        const script = supabaseStatus?.sqlScript || "";
+                        if (script) {
+                          navigator.clipboard.writeText(script);
+                          setCopiedScript(true);
+                          setTimeout(() => setCopiedScript(false), 2500);
+                        }
+                      }}
+                      className="px-4 py-2 border border-stone-200 hover:bg-stone-50 text-stone-800 rounded-full text-[10px] uppercase font-bold tracking-wider transition-colors inline-flex items-center gap-1.5"
+                    >
+                      {copiedScript ? "✓ Copied to clipboard" : "Copy SQL Script"}
+                    </button>
+                  </div>
+
+                  <div className="relative">
+                    <pre className="p-5 rounded-2xl bg-stone-900 text-stone-200 text-xs font-mono overflow-x-auto overflow-y-auto max-h-[300px] border border-stone-800 shadow-inner">
+                      {supabaseStatus?.sqlScript || `-- Loading SQL tables schema script...\n-- Copyable on setup`}
+                    </pre>
+                  </div>
+                </div>
               </div>
             )}
 

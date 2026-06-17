@@ -44,6 +44,51 @@ async function sendToFormspree(eventType: string, data: any) {
   }
 }
 
+// Helper function to non-blockingly forward data records to Supabase table endpoints
+async function sendToSupabase(table: string, payload: any, method = "POST", query = "") {
+  try {
+    const supabaseUrl = process.env.SUPABASE_URL || "https://zsorsmfbxllznwestqvd.supabase.co/rest/v1/";
+    const supabaseKey = process.env.SUPABASE_KEY || "sb_publishable_Yq4I-WKkQcZnGByXX4s4Cw_bO8Of4hO";
+    
+    let url = `${supabaseUrl.replace(/\/$/, "")}/${table}`;
+    if (query) {
+      url += `?${query}`;
+    }
+    const headers: any = {
+      "apikey": supabaseKey,
+      "Authorization": `Bearer ${supabaseKey}`,
+      "Content-Type": "application/json"
+    };
+
+    if (method === "POST") {
+      headers["Prefer"] = "resolution=merge-duplicates";
+    }
+
+    console.log(`[Supabase] Sending ${method} details to route: ${url}`);
+    
+    // Fire-and-forget non-blocking fetch to ensure excellent client latency
+    globalThis.fetch(url, {
+      method,
+      headers,
+      body: method !== "DELETE" ? JSON.stringify(payload) : undefined
+    }).then(async (response) => {
+      if (response.ok) {
+        console.log(`[Supabase] successfully executed ${method} on table '${table}'`);
+      } else {
+        const text = await response.text();
+        console.warn(`[Supabase] Warning: Endpoint ${method} response status ${response.status} for table '${table}': ${text}. Please verify table schema columns in Supabase dashboard.`);
+      }
+    }).catch((err) => {
+      console.error(`[Supabase] Connection error during ${method} to table '${table}':`, err);
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error(`[Supabase] Exception in sendToSupabase for table '${table}':`, error.message);
+    return { success: false, error: error.message };
+  }
+}
+
 // Define interfaces for internal db
 interface DbSchema {
   admin: {
@@ -490,6 +535,17 @@ app.put("/api/customer/profile", async (req: Request, res: Response) => {
       profile: profileData
     });
 
+    // Send profile data update to Supabase table
+    sendToSupabase("customers", {
+      phone: profileData.phone,
+      name: profileData.name,
+      email: profileData.email,
+      createdAt: profileData.createdAt || new Date().toISOString(),
+      created_at: profileData.createdAt || new Date().toISOString(),
+      updatedAt: profileData.updatedAt || new Date().toISOString(),
+      updated_at: profileData.updatedAt || new Date().toISOString()
+    });
+
     // Re-fetch all bookings
     const bookings = db.bookings.filter((b: any) => b.customerPhone === cleanPhone);
 
@@ -557,6 +613,19 @@ app.put("/api/customer/bookings/:id", async (req: Request, res: Response) => {
       booking: db.bookings[idx]
     });
     
+    // Sync rescheduled booking to Supabase with PATCH
+    const updatedRescheduled = db.bookings[idx];
+    sendToSupabase("bookings", {
+      date: updatedRescheduled.date,
+      time: updatedRescheduled.time,
+      customerName: updatedRescheduled.customerName,
+      customer_name: updatedRescheduled.customerName,
+      customerEmail: updatedRescheduled.customerEmail,
+      customer_email: updatedRescheduled.customerEmail,
+      updatedAt: updatedRescheduled.updatedAt,
+      updated_at: updatedRescheduled.updatedAt
+    }, "PATCH", `id=eq.${id}`);
+    
     return res.json({ success: true, booking: db.bookings[idx], message: "Booking content revised successfully!" });
   } catch (err: any) {
     return res.status(500).json({ error: "Rescheduling processor failure: " + err.message });
@@ -594,6 +663,9 @@ app.delete("/api/customer/bookings/:id", async (req: Request, res: Response) => 
     sendToFormspree("BOOKING_CANCELLED", {
       cancelledBooking
     });
+    
+    // Sync booking cancellation to Supabase with DELETE
+    sendToSupabase("bookings", null, "DELETE", `id=eq.${id}`);
     
     return res.json({ success: true, message: "Look reservation has been cancelled and slot released successfully." });
   } catch (err: any) {
@@ -791,6 +863,35 @@ app.post("/api/bookings", sensitiveRateLimiter(6, 60000), async (req: Request, r
       booking: newBooking
     });
 
+    // Send booking data to Supabase table
+    sendToSupabase("bookings", {
+      id: newBooking.id,
+      customerName: newBooking.customerName,
+      customer_name: newBooking.customerName,
+      customerEmail: newBooking.customerEmail,
+      customer_email: newBooking.customerEmail,
+      customerPhone: newBooking.customerPhone,
+      customer_phone: newBooking.customerPhone,
+      date: newBooking.date,
+      time: newBooking.time,
+      serviceId: newBooking.serviceId || "",
+      service_id: newBooking.serviceId || "",
+      packageId: newBooking.packageId || "",
+      package_id: newBooking.packageId || "",
+      selectedName: newBooking.selectedName,
+      selected_name: newBooking.selectedName,
+      amountPaid: Number(newBooking.amountPaid),
+      amount_paid: Number(newBooking.amountPaid),
+      paymentMethod: newBooking.paymentMethod,
+      payment_method: newBooking.paymentMethod,
+      paymentStatus: newBooking.paymentStatus,
+      payment_status: newBooking.paymentStatus,
+      receiptNo: newBooking.receiptNo,
+      receipt_no: newBooking.receiptNo,
+      createdAt: newBooking.createdAt,
+      created_at: newBooking.createdAt
+    });
+
     res.status(201).json({
       success: true,
       booking: newBooking,
@@ -961,6 +1062,186 @@ app.get("/api/admin/analytics", adminAuthGate, async (req: Request, res: Respons
     });
   } catch (err: any) {
     res.status(500).json({ error: "Could not compute live analytics summary." });
+  }
+});
+
+// Admin: Retrieve Supabase connection status, settings parameters, & initialization scripts
+app.get("/api/admin/supabase-status", adminAuthGate, async (req: Request, res: Response) => {
+  try {
+    const supabaseUrl = process.env.SUPABASE_URL || "https://zsorsmfbxllznwestqvd.supabase.co/rest/v1/";
+    const supabaseKey = process.env.SUPABASE_KEY || "sb_publishable_Yq4I-WKkQcZnGByXX4s4Cw_bO8Of4hO";
+    const cleanUrl = supabaseUrl.replace(/\/$/, "");
+
+    // Ping Supabase base REST route to see if it is reachable
+    const response = await globalThis.fetch(`${cleanUrl}/`, {
+      method: "GET",
+      headers: {
+        "apikey": supabaseKey,
+        "Authorization": `Bearer ${supabaseKey}`
+      }
+    });
+
+    res.json({
+      online: response.status < 400 || response.status === 401,
+      status: response.status,
+      supabaseUrl: cleanUrl,
+      projectId: "zsorsmfbxllznwestqvd",
+      sqlScript: `-- Supabase SQL Schema setup script for Beaution Studio
+-- copy and execute this block in Supabase sql editor
+
+-- Table 1: Bookings
+CREATE TABLE IF NOT EXISTS bookings (
+  id text PRIMARY KEY,
+  customer_name text,
+  customerName text,
+  customer_email text,
+  customerEmail text,
+  customer_phone text,
+  customerPhone text,
+  date text,
+  time text,
+  service_id text,
+  serviceId text,
+  package_id text,
+  packageId text,
+  selected_name text,
+  selectedName text,
+  amount_paid numeric,
+  amountPaid numeric,
+  payment_method text,
+  paymentMethod text,
+  payment_status text,
+  paymentStatus text,
+  receipt_no text,
+  receiptNo text,
+  created_at text,
+  createdAt text,
+  updated_at text,
+  updatedAt text
+);
+
+-- Table 2: Customers Profiles
+CREATE TABLE IF NOT EXISTS customers (
+  phone text PRIMARY KEY,
+  name text,
+  email text,
+  created_at text,
+  createdAt text,
+  updated_at text,
+  updatedAt text
+);
+
+-- Table 3: Messages Feed
+CREATE TABLE IF NOT EXISTS messages (
+  id text PRIMARY KEY,
+  name text,
+  phone text,
+  email text,
+  service text,
+  message text,
+  status text,
+  created_at text,
+  createdAt text
+);`
+    });
+  } catch (error: any) {
+    res.json({
+      online: false,
+      error: error.message,
+      supabaseUrl: process.env.SUPABASE_URL || "https://zsorsmfbxllznwestqvd.supabase.co/rest/v1/",
+      projectId: "zsorsmfbxllznwestqvd"
+    });
+  }
+});
+
+// Admin: Mass-synchronize entire local JSON database records to Supabase tables
+app.post("/api/admin/supabase-sync", adminAuthGate, async (req: Request, res: Response) => {
+  try {
+    const db = await getDb();
+    const reports: any = { bookings: [], customers: [], messages: [] };
+
+    console.log(`[Supabase Sync] Bulk synchronization requested...`);
+
+    // 1. Sync Bookings
+    if (db.bookings && Array.isArray(db.bookings)) {
+      for (const b of db.bookings) {
+        const row = {
+          id: b.id,
+          customerName: b.customerName,
+          customer_name: b.customerName,
+          customerEmail: b.customerEmail,
+          customer_email: b.customerEmail,
+          customerPhone: b.customerPhone,
+          customer_phone: b.customerPhone,
+          date: b.date,
+          time: b.time,
+          serviceId: b.serviceId || "",
+          service_id: b.serviceId || "",
+          packageId: b.packageId || "",
+          package_id: b.packageId || "",
+          selectedName: b.selectedName || "",
+          selected_name: b.selectedName || "",
+          amountPaid: Number(b.amountPaid || 0),
+          amount_paid: Number(b.amountPaid || 0),
+          paymentMethod: b.paymentMethod || "COD",
+          payment_method: b.paymentMethod || "COD",
+          paymentStatus: b.paymentStatus || "Completed",
+          payment_status: b.paymentStatus || "Completed",
+          receiptNo: b.receiptNo || "",
+          receipt_no: b.receiptNo || "",
+          createdAt: b.createdAt || new Date().toISOString(),
+          created_at: b.createdAt || new Date().toISOString(),
+          updatedAt: b.updatedAt || "",
+          updated_at: b.updatedAt || ""
+        };
+        const syncRes = await sendToSupabase("bookings", row);
+        reports.bookings.push({ id: b.id, success: syncRes.success });
+      }
+    }
+
+    // 2. Sync Customers Profiles
+    if (db.customers && Array.isArray(db.customers)) {
+      for (const c of db.customers) {
+        const row = {
+          phone: c.phone,
+          name: c.name,
+          email: c.email,
+          createdAt: c.createdAt || new Date().toISOString(),
+          created_at: c.createdAt || new Date().toISOString(),
+          updatedAt: c.updatedAt || "",
+          updated_at: c.updatedAt || ""
+        };
+        const syncRes = await sendToSupabase("customers", row);
+        reports.customers.push({ phone: c.phone, success: syncRes.success });
+      }
+    }
+
+    // 3. Sync Messages
+    if (db.messages && Array.isArray(db.messages)) {
+      for (const m of db.messages) {
+        const row = {
+          id: m.id,
+          name: m.name,
+          phone: m.phone || "N/A",
+          email: m.email,
+          service: m.service || "Contact Form Inquiry",
+          message: m.message,
+          status: m.status || "Unread",
+          createdAt: m.createdAt || new Date().toISOString(),
+          created_at: m.createdAt || new Date().toISOString()
+        };
+        const syncRes = await sendToSupabase("messages", row);
+        reports.messages.push({ id: m.id, success: syncRes.success });
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `Database synchronization processing triggered.`,
+      reports
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: "Db bulk sync procedure failed: " + error.message });
   }
 });
 
